@@ -79,17 +79,17 @@ def cut_signal(time: ndarray, signal: list, start_time: float = None, end_time: 
 
     return time, signal
 
-def show_figure(time: list, signals: list, x_label: str = 'Czas [s]', y_label: str = 'Amplituda',
+def show_figure(keys: list, values, x_label: str = 'Czas [s]', y_label: str = 'Amplituda',
                 title: str = 'Wizualizacja sygnału EKG') -> None:
     """
-    :param time: Array of keys
-    :param signals: Array of arrays with values
+    :param keys: Array of keys
+    :param values: Array of arrays with values
     :param x_label: X label
     :param y_label: T label
     :param title: Title of figure
     """
     plt.figure(figsize=(10, 5))
-    plot_signals(time,signals)
+    plot_signals(keys, values)
     plt.xlabel(x_label)
     plt.ylabel(y_label)
     plt.title(title)
@@ -117,7 +117,7 @@ def generate_sinus(samples_count: int=65536, fs: int=1000, f:int=50) -> (ndarray
     return t, x
 
 def get_signal_spectrum_fft(signal: list, fs: int, samples_count: int) -> (ndarray, ndarray):
-    # Obliczenie DFT sygnału
+    # Obliczenie FFT sygnału
     signal_fft = np.fft.fft(signal)
 
     # Obliczenie częstotliwości
@@ -216,5 +216,37 @@ def cwiczenie2():
     cwiczenie2_d()
     cwiczenie2_e()
 
-cwiczenie1()
-cwiczenie2()
+def cwiczenie3():
+    data = np.loadtxt("ekg100.txt")
+    time, signal = load_signal(data, 0)
+    show_figure(time,[signal])
+
+    fs = 1000
+    freq, values = get_signal_spectrum_fft(signal,fs,len(signal))
+    show_figure(freq, [values], 'Czestotliwość [Hz]','Amplituda',f'Widmo amplitudowe sygnału, czestotliwosc probkowania {fs} Hz')
+
+    fs = 100000
+    freq, values = get_signal_spectrum_fft(signal,fs,len(signal))
+    show_figure(freq, [values], 'Czestotliwość [Hz]','Amplituda',f'Widmo amplitudowe sygnału, czestotliwosc probkowania {fs} Hz')
+
+    fs = 30000
+    freq, values = get_signal_spectrum_fft(signal,fs,len(signal))
+    show_figure(freq, [values], 'Czestotliwość [Hz]','Amplituda',f'Widmo amplitudowe sygnału, czestotliwosc probkowania {fs} Hz')
+
+    fs = 40000
+    freq, values = get_signal_spectrum_fft(signal,fs,len(signal))
+    show_figure(freq, [values], 'Czestotliwość [Hz]','Amplituda',f'Widmo amplitudowe sygnału, czestotliwosc probkowania {fs} Hz')
+
+def cwiczenie4():
+    data = np.loadtxt("ekg_noise.txt")
+    time, signal = load_signal(data,1 )
+    show_figure(time,[signal])
+
+
+# TODO: naprawic odwracanie formaty (cwiczenie 2 podpunkt 5)
+# TODO: naprawic odwracanie formaty (cwiczenie 3 podpunkt 3)
+# TODO: Kontynuować zadania (cwiczenie 4)
+#cwiczenie1()
+#cwiczenie2()
+#cwiczenie3()
+cwiczenie4()
