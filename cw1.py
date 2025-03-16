@@ -1,13 +1,16 @@
-from operator import index
-from sys import exception
-
 import matplotlib
+from numpy import ndarray
 matplotlib.use('TkAgg')
 import numpy as np
 import matplotlib.pyplot as plt
 
-def load_signal(data: np.ndarray, lead_index: int, use_time_column=False):
-
+def load_signal(data: np.ndarray, lead_index: int, use_time_column=False) -> (ndarray, ndarray):
+    """
+    :param data: 2D/1D array
+    :param lead_index: Column to use as values
+    :param use_time_column: Use first column as time entry
+    :return: Pair of arrays (time, value)
+    """
     if data.ndim == 1:
         return np.arange(len(data)), data
 
@@ -20,7 +23,15 @@ def load_signal(data: np.ndarray, lead_index: int, use_time_column=False):
 
     return time_column, data[:, lead_index]
 
-def plot_ekg(time, signals, start_time=None, end_time=None, min_value=None, max_value=None):
+def plot_ekg(time: ndarray, signals: list[list], start_time: float = None, end_time: float = None, min_value: float = None, max_value: float = None) -> None:
+    """
+    :param time: 1D array of keys
+    :param signals: Array of arrays with values
+    :param start_time: Start key to cut values
+    :param end_time: End key to cut values
+    :param min_value: Max value of signal to show
+    :param max_value: Min value of singal to show
+    """
     signals_to_show = []
     time_cut = cut_signal(time,signals[0],start_time, end_time)[0]
     for sig in signals:
@@ -28,16 +39,31 @@ def plot_ekg(time, signals, start_time=None, end_time=None, min_value=None, max_
 
     show_figure(time_cut, signals_to_show)
 
-def plot_signals(time_col, signals):
+def plot_signals(time_col: list, signals: list[list]) -> None:
+    """
+    :param time_col: Array of keys
+    :param signals: Array of arrays with values
+    """
     for idx, sig in enumerate(signals):
         plt.plot(time_col, sig, label=f'Sygnał EKG {idx+1}')
 
-def cut_signal(time, signal, start_time=None, end_time=None, min_value=None, max_value=None):
+def cut_signal(time: ndarray, signal: list, start_time: float = None, end_time: float = None, min_value: float = None, max_value: float = None) -> (ndarray, ndarray):
+    """
+    :param time: Array of keys
+    :param signal: Array of values
+    :param start_time: Start key to cut values
+    :param end_time: End key to cut values
+    :param min_value: Max value of signal to show
+    :param max_value: Min value of singal to show
+    :return:
+    """
     mask = None
-    if start_time is not None:
-        mask = time >= start_time
-    if end_time is not None:
+    if start_time is not None and end_time is not None:
+        mask = (time <= end_time) & (time >= start_time)
+    elif end_time is not None:
         mask = time <= end_time
+    elif start_time is not None:
+        mask = time >= start_time
 
     if min_value is not None or max_value is not None:
         for idx,x in enumerate(signal):
@@ -53,7 +79,15 @@ def cut_signal(time, signal, start_time=None, end_time=None, min_value=None, max
 
     return time, signal
 
-def show_figure(time, signals, x_label='Czas [s]', y_label='Amplituda', title='Wizualizacja sygnału EKG'):
+def show_figure(time: list, signals: list, x_label: str = 'Czas [s]', y_label: str = 'Amplituda',
+                title: str = 'Wizualizacja sygnału EKG') -> None:
+    """
+    :param time: Array of keys
+    :param signals: Array of arrays with values
+    :param x_label: X label
+    :param y_label: T label
+    :param title: Title of figure
+    """
     plt.figure(figsize=(10, 5))
     plot_signals(time,signals)
     plt.xlabel(x_label)
@@ -63,9 +97,16 @@ def show_figure(time, signals, x_label='Czas [s]', y_label='Amplituda', title='W
     plt.grid()
     plt.show()
 
-def save_ekg(filename, time, signal, start_time, end_time):
-    mask = (time >= start_time) & (time <= end_time)
-    segment = np.column_stack((time[mask], signal[mask]))
+def save_ekg(filename: str, time: ndarray, signal: list, start_time: float, end_time: float) -> None:
+    """
+    :param filename: Destination file name
+    :param time: Array of keys
+    :param signal: Array of values
+    :param start_time: Start key to cut values
+    :param end_time: End key to cut values
+    """
+    time, signal = cut_signal(time, signal, start_time, end_time)
+    segment = np.column_stack((time, signal))
     np.savetxt(filename, segment, fmt='%f', delimiter=' ', header='Czas Amplituda')
     print(f"Zapisano wycinek sygnału do pliku: {filename}")
 
@@ -74,6 +115,8 @@ def save_ekg(filename, time, signal, start_time, end_time):
 
 def cwiczenie1():
     _filenames = ["ekg100.txt", "ekg1.txt", "ekg_noise.txt"]
+    time = []
+    signal = []
     for _filename in _filenames:
         data = np.loadtxt(_filename)
 
@@ -101,8 +144,9 @@ def cwiczenie2():
     t = np.arange(0, 65536) * T  # Wektor czasu (t)
     x = np.sin(2 * np.pi * f * t)  # Sygnał sinusoidalny
 
-    show_figure(t,x,'Czas [s]','Amplituda','Sygnał sinusoidalny o częstotliwości 50 Hz')
+    t, x = cut_signal(t, x,0.5, 0.55)
+    show_figure(t,[x],'Czas [s]','Amplituda','Sygnał sinusoidalny o częstotliwości 50 Hz')
 
 
 cwiczenie1()
-#cwiczenie2()
+cwiczenie2()
