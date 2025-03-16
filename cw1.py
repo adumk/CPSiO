@@ -110,10 +110,29 @@ def save_ekg(filename: str, time: ndarray, signal: list, start_time: float, end_
     np.savetxt(filename, segment, fmt='%f', delimiter=' ', header='Czas Amplituda')
     print(f"Zapisano wycinek sygnału do pliku: {filename}")
 
+def generate_sinus(samples_count: int=65536, fs: int=1000, f:int=50) -> (ndarray, ndarray):
+    sample_t = 1 / fs  # Okres próbkowania
+    t = np.arange(0, samples_count) * sample_t  # Wektor czasu (t)
+    x = np.sin(2 * np.pi * f * t)  # Sygnał sinusoidalny
+    return t, x
 
-# Wczytanie danych
+def get_signal_spectrum_fft(signal: list, fs: int, samples_count: int) -> (ndarray, ndarray):
+    # Obliczenie DFT sygnału
+    signal_fft = np.fft.fft(signal)
 
-def cwiczenie1():
+    # Obliczenie częstotliwości
+    frequencies = np.fft.fftfreq(samples_count, 1 / fs)
+
+    # Wyznaczenie widma amplitudowego (tylko dodatnie częstotliwości)
+    amplitude_spectrum = np.abs(signal_fft[:samples_count // 2])
+    frequencies_positive = frequencies[:samples_count // 2]
+
+    return frequencies_positive, amplitude_spectrum
+
+def get_signal_from_spectrum_ifft(signal_spectrum: list) -> ndarray:
+    return np.real(np.fft.ifft( np.concatenate((signal_spectrum, signal_spectrum[::-1]))))
+
+def cwiczenie1() -> None:
     _filenames = ["ekg100.txt", "ekg1.txt", "ekg_noise.txt"]
     time = []
     signal = []
@@ -136,17 +155,66 @@ def cwiczenie1():
     # Zapisanie wycinka sygnału do pliku
     save_ekg("ekg_segment.txt", time, signal, start_time=0.0, end_time=10)
 
-def cwiczenie2():
+def cwiczenie2_a() -> None:
     # Parametry sygnału
+    samples_count = 65536 # Ilosc probek
     fs = 1000  # Częstotliwość próbkowania (Hz)
     f = 50  # Częstotliwość fali sinusoidalnej (Hz)
-    T = 1 / fs  # Okres próbkowania
-    t = np.arange(0, 65536) * T  # Wektor czasu (t)
-    x = np.sin(2 * np.pi * f * t)  # Sygnał sinusoidalny
+    time, signal = generate_sinus(samples_count, fs, f)
+    time, signal_cut = cut_signal(time, signal, 0.1, 0.25)
+    show_figure(time,[signal_cut],'Czas [s]','Amplituda','Wycinek sygnału sinusoidalnego o częstotliwości 50 Hz')
 
-    t, x = cut_signal(t, x,0.5, 0.55)
-    show_figure(t,[x],'Czas [s]','Amplituda','Sygnał sinusoidalny o częstotliwości 50 Hz')
+def cwiczenie2_b() -> None:
+    # Parametry sygnału
+    samples_count = 65536  # Ilosc probek
+    fs = 1000  # Częstotliwość próbkowania (Hz)
+    f = 50  # Częstotliwość fali sinusoidalnej (Hz)
+    time, signal = generate_sinus(samples_count, fs, f)
+    time, signal_cut = cut_signal(time, signal, 0.1, 0.25)
+    freq, values_50Hz = get_signal_spectrum_fft(signal, fs, samples_count)
+    show_figure(freq,[values_50Hz],'Czestotliwość [Hz]','Amplituda','Widmo amplitudowe sygnału 50 Hz')
 
+def cwiczenie2_c(fs: int) -> None:
+    samples_count = 65536  # Ilosc probek
+    time, signal_50Hz = generate_sinus(samples_count, fs, 50)
+    time, signal_60Hz = generate_sinus(samples_count, fs, 60)
+    singal_mix = signal_50Hz + signal_60Hz
+
+    time_cut, signal = cut_signal(time, singal_mix, 0.1, 0.25)
+    show_figure(time_cut,[signal],'Czas [s]','Amplituda',f'Wycinek sygnalu 50Hz+60Hz, czestotliwosc probkowania {fs} Hz')
+
+    samples_count = 65536  # Ilosc probek
+    time, signal_50Hz = generate_sinus(samples_count, fs, 50)
+    time, signal_60Hz = generate_sinus(samples_count, fs, 60)
+    singal_mix = signal_50Hz + signal_60Hz
+    freq, values = get_signal_spectrum_fft(singal_mix, fs, samples_count)
+    show_figure(freq,[values],'Czestotliwość [Hz]','Amplituda',f'Widmo amplitudowe sygnału 50Hz+60Hz, czestotliwosc probkowania {fs} Hz')
+
+def cwiczenie2_d():
+    cwiczenie2_c(2000)
+    cwiczenie2_c(1500)
+    cwiczenie2_c(500)
+    cwiczenie2_c(200)
+    cwiczenie2_c(130)
+    cwiczenie2_c(90)
+    cwiczenie2_c(20)
+
+def cwiczenie2_e():
+    samples_count = 65536  # Ilosc probek
+    fs = 1000  # Częstotliwość próbkowania (Hz)
+    f = 50  # Częstotliwość fali sinusoidalnej (Hz)
+    time, signal = generate_sinus(samples_count, fs, f)
+    freq, values_50Hz = get_signal_spectrum_fft(signal, fs, samples_count)
+    signal = get_signal_from_spectrum_ifft(values_50Hz)
+    show_figure(time,[signal],'Czas [s]','Amplituda','Odzyskany sygnal z widma')
+
+
+def cwiczenie2():
+    cwiczenie2_a()
+    cwiczenie2_b()
+    cwiczenie2_c(1000)
+    cwiczenie2_d()
+    cwiczenie2_e()
 
 cwiczenie1()
 cwiczenie2()
