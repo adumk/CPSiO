@@ -129,6 +129,11 @@ def get_signal_spectrum_fft(signal: list, fs: int, samples_count: int) -> (ndarr
 
     return frequencies_positive, amplitude_spectrum
 
+def get_full_signal_spectrum_fft(signal: list, fs: int, samples_count: int) -> (ndarray, ndarray):
+    signal_fft = np.fft.fft(signal)  # Pobieramy pełne FFT
+    frequencies = np.fft.fftfreq(samples_count, 1 / fs)  # Pełna siatka częstotliwości
+    return frequencies, signal_fft  # Zwracamy PEŁNE wartości FFT
+
 def get_signal_from_spectrum_ifft(signal_spectrum: list) -> ndarray:
     return np.real(np.fft.ifft( np.concatenate((signal_spectrum, signal_spectrum[::-1]))))
 
@@ -199,14 +204,54 @@ def cwiczenie2_d():
     cwiczenie2_c(90)
     cwiczenie2_c(20)
 
-def cwiczenie2_e():
+def cwiczenie2_e(fs : int):
+    # samples_count = 65536  # Ilosc probek
+    # fs = 100000  # Częstotliwość próbkowania (Hz)
+    # f = 50  # Częstotliwość fali sinusoidalnej (Hz)
+    # time, signal = generate_sinus(samples_count, fs, f)
+    # freq, values_50Hz = get_signal_spectrum_fft(signal, fs, samples_count)
+    # signal = get_signal_from_spectrum_ifft(values_50Hz)
+    # show_figure(time,[signal],'Czas [s]','Amplituda','Odzyskany sygnal z widma')
+
     samples_count = 65536  # Ilosc probek
-    fs = 1000  # Częstotliwość próbkowania (Hz)
-    f = 50  # Częstotliwość fali sinusoidalnej (Hz)
-    time, signal = generate_sinus(samples_count, fs, f)
-    freq, values_50Hz = get_signal_spectrum_fft(signal, fs, samples_count)
-    signal = get_signal_from_spectrum_ifft(values_50Hz)
-    show_figure(time,[signal],'Czas [s]','Amplituda','Odzyskany sygnal z widma')
+    time, signal_50Hz = generate_sinus(samples_count, fs, 50)
+
+    freq, values = get_full_signal_spectrum_fft(signal_50Hz, fs, samples_count)
+
+    reconstructed_signal = np.fft.ifft(values).real
+
+    time = np.arange(samples_count) / fs
+
+
+    plt.figure(figsize=(10, 5))
+    plt.plot(time, signal_50Hz, label="Oryginalny sygnał")
+    plt.plot(time, reconstructed_signal, '--', label="Zrekonstruowany sygnał (IFFT)", alpha=0.7)
+    plt.xlabel("Czas [s]")
+    plt.ylabel("Amplituda")
+    plt.legend()
+    plt.title("Porównanie sygnału oryginalnego i po IFFT, fala sinusoidalna 50Hz")
+    plt.show()
+
+    samples_count = 65536  # Ilosc probek
+    time, signal_50Hz = generate_sinus(samples_count, fs, 50)
+    time, signal_60Hz = generate_sinus(samples_count, fs, 60)
+    singal_mix = signal_50Hz + signal_60Hz
+
+    freq, values = get_full_signal_spectrum_fft(singal_mix, fs, samples_count)
+
+    reconstructed_signal = np.fft.ifft(values).real
+
+    time = np.arange(samples_count) / fs
+
+
+    plt.figure(figsize=(10, 5))
+    plt.plot(time, singal_mix, label="Oryginalny sygnał")
+    plt.plot(time, reconstructed_signal, '--', label="Zrekonstruowany sygnał (IFFT)", alpha=0.7)
+    plt.xlabel("Czas [s]")
+    plt.ylabel("Amplituda")
+    plt.legend()
+    plt.title("Porównanie sygnału oryginalnego i po IFFT, mieszanina fal sinusoidalnych 50Hz i 60Hz")
+    plt.show()
 
 
 def cwiczenie2():
@@ -214,39 +259,65 @@ def cwiczenie2():
     cwiczenie2_b()
     cwiczenie2_c(1000)
     cwiczenie2_d()
-    cwiczenie2_e()
+    cwiczenie2_e(100000)
 
 def cwiczenie3():
     data = np.loadtxt("ekg100.txt")
     time, signal = load_signal(data, 0)
     show_figure(time,[signal])
 
-    fs = 1000
-    freq, values = get_signal_spectrum_fft(signal,fs,len(signal))
-    show_figure(freq, [values], 'Czestotliwość [Hz]','Amplituda',f'Widmo amplitudowe sygnału, czestotliwosc probkowania {fs} Hz')
+    for fs in [100000, 40000, 30000, 1000]:
+        # Obliczenie widma
+        freq, values = get_signal_spectrum_fft(signal, fs, len(signal))
+        show_figure(freq, [values], 'Częstotliwość [Hz]', 'Amplituda', f'Widmo amplitudowe sygnału, częstotliwość próbkowania {fs} Hz')
 
-    fs = 100000
-    freq, values = get_signal_spectrum_fft(signal,fs,len(signal))
-    show_figure(freq, [values], 'Czestotliwość [Hz]','Amplituda',f'Widmo amplitudowe sygnału, czestotliwosc probkowania {fs} Hz')
+        # Pełne widmo + IFFT
+        freq, values = get_full_signal_spectrum_fft(signal, fs, len(signal))
+        reconstructed_signal = np.fft.ifft(values).real
 
-    fs = 30000
-    freq, values = get_signal_spectrum_fft(signal,fs,len(signal))
-    show_figure(freq, [values], 'Czestotliwość [Hz]','Amplituda',f'Widmo amplitudowe sygnału, czestotliwosc probkowania {fs} Hz')
+        # Różnica między oryginalnym a zrekonstruowanym sygnałem
+        difference = signal - reconstructed_signal
 
-    fs = 40000
-    freq, values = get_signal_spectrum_fft(signal,fs,len(signal))
-    show_figure(freq, [values], 'Czestotliwość [Hz]','Amplituda',f'Widmo amplitudowe sygnału, czestotliwosc probkowania {fs} Hz')
+        # Poprawny wektor czasu
+        time = np.arange(len(signal)) / fs
+
+        # Wykres sygnału oryginalnego i zrekonstruowanego
+        plt.figure(figsize=(10, 5))
+        plt.plot(time, signal, label="Oryginalny sygnał")
+        plt.plot(time, reconstructed_signal, '--', label="Zrekonstruowany sygnał (IFFT)", alpha=0.7)
+        plt.xlabel("Czas [s]")
+        plt.ylabel("Amplituda")
+        plt.legend()
+        plt.title(f"Porównanie sygnału oryginalnego i po IFFT (fs={fs} Hz)")
+        plt.show()
+
+        max_error = np.max(np.abs(signal - reconstructed_signal))
+        print("Maksymalny błąd rekonstrukcji:", max_error)
+
+        mean_error = np.mean(np.abs(signal - reconstructed_signal))
+        print("Średni błąd rekonstrukcji:", mean_error)
+
+        print("Zakres wartości różnicy:", np.min(signal - reconstructed_signal),
+              np.max(signal - reconstructed_signal))
+        print("\n")
+
+        # Wykres różnicy sygnałów
+        plt.figure(figsize=(10, 5))
+        plt.plot(time, difference, label="Różnica sygnałów", color='red')
+        plt.xlabel("Czas [s]")
+        plt.ylabel("Amplituda różnicy")
+        plt.legend()
+        plt.title(f"Różnica sygnału oryginalnego i IFFT (fs={fs} Hz)")
+        plt.ylim(-1e-14, 1e-14)
+        plt.show()
 
 def cwiczenie4():
     data = np.loadtxt("ekg_noise.txt")
     time, signal = load_signal(data,1 )
     show_figure(time,[signal])
 
-
-# TODO: naprawic odwracanie formaty (cwiczenie 2 podpunkt 5)
-# TODO: naprawic odwracanie formaty (cwiczenie 3 podpunkt 3)
 # TODO: Kontynuować zadania (cwiczenie 4)
 #cwiczenie1()
-#cwiczenie2()
-#cwiczenie3()
-cwiczenie4()
+cwiczenie2()
+cwiczenie3()
+#cwiczenie4()
