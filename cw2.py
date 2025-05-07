@@ -168,7 +168,7 @@ def rysuj_histogram(obraz, tytul):
     plt.grid(True)
 
 
-def lokalne_wyrownanie_histogramu(obraz, rozmiar_okna=15):
+def lokalne_wyrownanie_histogramu(obraz, rozmiar_okna=3):
     """Lokalne wyrównywanie histogramu na obrazie."""
     obraz_gray = obraz.convert('L')  # Przekształcamy obraz do odcieni szarości
     obraz_array = np.array(obraz_gray)
@@ -189,13 +189,15 @@ def lokalne_wyrownanie_histogramu(obraz, rozmiar_okna=15):
     return Image.fromarray(np.uint8(wyniki))
 
 
-def lokalne_poprawa_jakosci(obraz, rozmiar_okna=15):
+def lokalne_poprawa_jakosci(obraz, rozmiar_okna=10):
     """Poprawa jakości obrazu oparta na lokalnych statystykach."""
     obraz_gray = obraz.convert('L')  # Przekształcamy obraz do odcieni szarości
     obraz_array = np.array(obraz_gray)
 
     k, l = rozmiar_okna, rozmiar_okna
     wyniki = np.zeros_like(obraz_array)
+
+    #TODO: zaimplementowac funkcje progowa - wyklad 3 slajd 120
 
     # Przechodzimy po obrazie w oknach
     for i in range(rozmiar_okna // 2, obraz_array.shape[0] - rozmiar_okna // 2):
@@ -297,6 +299,7 @@ def zastosuj_filtr_gaussowski(obraz, rozmiar_maski):
 
 
 ######
+#TODO: naprawic zwracany typ - np stworzyc osobna funkcje
 def filtr_sobel(obraz):
     """Wykrywanie krawędzi z użyciem filtra Sobela."""
     # Sobel dla krawędzi poziomych (Gx) i pionowych (Gy)
@@ -312,7 +315,7 @@ def filtr_sobel(obraz):
     # Łączenie wyników, aby uzyskać krawędzie ukośne
     krawedzie_ukosne = np.sqrt(krawedzie_poziome ** 2 + krawedzie_pionowe ** 2)
 
-    return krawedzie_poziome, krawedzie_pionowe, krawedzie_ukosne
+    return Image.fromarray(krawedzie_poziome), Image.fromarray(krawedzie_pionowe), Image.fromarray(krawedzie_ukosne)
 
 
 def filtr_laplasjan(obraz):
@@ -352,7 +355,7 @@ def high_boost_filtering(obraz, sigma=1.0, gain=1.5):
     return np.clip(high_boost_image, 0, 255)
 
 
-def main():
+def cwiczenie5():
     # 1. Wczytywanie obrazu
     nazwa_pliku = input("Podaj nazwę pliku obrazu: ")
     obraz = wczytaj_obraz(nazwa_pliku)
@@ -382,7 +385,8 @@ def main():
 
     print(f"Podobraz zapisany jako {nazwa_zapisu}.")
 
-    # Wczytywanie obrazu
+def cwiczenie6():
+    # 1. Wczytywanie obrazu
     nazwa_pliku = input("Podaj nazwę pliku obrazu: ")
     obraz = wczytaj_obraz(nazwa_pliku)
 
@@ -437,6 +441,7 @@ def main():
     wykres_transformacji(c_gamma, lambda r, _: przeksztalcenie_gamma_function(r, c_gamma, gamma), "Korekcja gamma")
     plt.show()
 
+def cwiczenie7():
     # Wczytywanie obrazów (np. obrazy zbyt ciemne i zbyt jasne)
     nazwa_pliku = input("Podaj nazwę pliku obrazu (ciemny lub jasny): ")
     obraz = wczytaj_obraz(nazwa_pliku)
@@ -469,9 +474,14 @@ def main():
     # Wyświetlanie wyników
     plt.show()
 
+def cwiczenie8():
     # Wczytywanie obrazu (np. obrazy zbyt ciemne i zbyt jasne)
-    nazwa_pliku = input("Podaj nazwę pliku obrazu (ciemny lub jasny): ")
+    #nazwa_pliku = input("Podaj nazwę pliku obrazu (ciemny lub jasny): ")
+    nazwa_pliku = "hidden-symbols.tif"
     obraz = wczytaj_obraz(nazwa_pliku)
+
+    rozmiar_okna_wyrownania = input("Podaj rozmiar okna wyrownania: ")
+    rozmiar_okna_poprawy = input("Podaj rozmiar okna poprawy: ")
 
     # Wyświetlanie obrazu przed przekształceniami
     plt.figure(figsize=(12, 6))
@@ -485,7 +495,7 @@ def main():
     rysuj_histogram(obraz, 'Histogram przed przekształceniem')
 
     # Wykonanie lokalnego wyrównywania histogramu
-    obraz_wyrownany = lokalne_wyrownanie_histogramu(obraz)
+    obraz_wyrownany = lokalne_wyrownanie_histogramu(obraz, int(rozmiar_okna_wyrownania))
 
     # Wyświetlanie obrazu po lokalnym wyrównaniu histogramu
     plt.figure(figsize=(12, 6))
@@ -499,7 +509,7 @@ def main():
     rysuj_histogram(obraz_wyrownany, 'Histogram po wyrównaniu')
 
     # Wykonanie poprawy jakości na podstawie lokalnych statystyk
-    obraz_poprawiony = lokalne_poprawa_jakosci(obraz)
+    obraz_poprawiony = lokalne_poprawa_jakosci(obraz, int(rozmiar_okna_poprawy))
 
     # Wyświetlanie obrazu po poprawie jakości
     plt.figure(figsize=(12, 6))
@@ -515,6 +525,7 @@ def main():
     # Wyświetlanie wyników
     plt.show()
 
+def cwiczenie9():
     # Wczytanie obrazu (np. zdjęcie w skali szarości)
     nazwa_pliku = input("Podaj nazwę pliku obrazu (np. obraz.jpg): ")
     obraz = Image.open(nazwa_pliku).convert('L')  # Wczytywanie w skali szarości
@@ -524,27 +535,28 @@ def main():
     obraz_szum = dodaj_szum_sol_i_pieprz(obraz, poziom_szumu)
 
     # Wyświetlanie obrazu z szumem i jego histogramu
-    pokaz_obraz_i_histogram(obraz, obraz_szum, "Obraz z szumem 'sól i pieprz'")
+    pokaz_obraz_i_histogram(obraz_szum, "Obraz z szumem 'sól i pieprz'")
 
     # Zastosowanie filtrów
     maska_rozmiar = 3
 
     # Filtr uśredniający
     obraz_umediany = filtr_usredniajacy(obraz_szum, maska_rozmiar)
-    pokaz_obraz_i_histogram(obraz_szum, obraz_umediany, "Filtr uśredniający")
+    pokaz_obraz_i_histogram( obraz_umediany, "Filtr uśredniający")
 
     # Filtr medianowy
     obraz_medianowy = filtr_medianowy(obraz_szum, maska_rozmiar)
-    pokaz_obraz_i_histogram(obraz_szum, obraz_medianowy, "Filtr medianowy")
+    pokaz_obraz_i_histogram( obraz_medianowy, "Filtr medianowy")
 
     # Filtr minimum
     obraz_min = filtr_minimum(obraz_szum, maska_rozmiar)
-    pokaz_obraz_i_histogram(obraz_szum, obraz_min, "Filtr minimum")
+    pokaz_obraz_i_histogram(obraz_min, "Filtr minimum")
 
     # Filtr maksimum
     obraz_max = filtr_maksimum(obraz_szum, maska_rozmiar)
-    pokaz_obraz_i_histogram(obraz_szum, obraz_max, "Filtr maksimum")
+    pokaz_obraz_i_histogram( obraz_max, "Filtr maksimum")
 
+def cwiczenie10():
     ######
     # Wczytanie obrazu (np. zdjęcie w skali szarości)
     nazwa_pliku = input("Podaj nazwę pliku obrazu (np. obraz.jpg): ")
@@ -562,10 +574,11 @@ def main():
         obraz_gaussowski = zastosuj_filtr_gaussowski(obraz, rozmiar_maski)
         pokaz_obraz_i_histogram(obraz_gaussowski, f'Filtr gaussowski - {rozmiar_maski}x{rozmiar_maski}')
 
+def cwiczenie11():
     ######
     # Wczytanie obrazu (np. zdjęcie w skali szarości)
     nazwa_pliku = input("Podaj nazwę pliku obrazu (np. obraz.jpg): ")
-    obraz = Image.open(nazwa_pliku).convert('L')  # Wczytanie obrazu w odcieniach szarości
+    obraz = Image.open(nazwa_pliku) # Wczytanie obrazu w odcieniach szarości
 
     # 1. Wykrywanie krawędzi - Sobel
     krawedzie_poziome, krawedzie_pionowe, krawedzie_ukosne = filtr_sobel(obraz)
@@ -585,6 +598,20 @@ def main():
     high_boost_obraz = high_boost_filtering(obraz, sigma=1.0, gain=1.5)
     pokaz_obraz_i_histogram(high_boost_obraz, 'Wyostrzony obraz - High Boost')
 
+def cwiczenie12():
+    nazwa_pliku = input("Podaj nazwę pliku obrazu (np. obraz.jpg): ")
+    obraz = Image.open(nazwa_pliku)
+
+
+
+def main():
+    #cwiczenie5()
+    # cwiczenie6()
+    # cwiczenie7()
+    # cwiczenie8()
+    # cwiczenie9()
+    # cwiczenie10()
+     cwiczenie11()
 
 if __name__ == "__main__":
     main()

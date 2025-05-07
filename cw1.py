@@ -3,6 +3,7 @@ from numpy import ndarray
 matplotlib.use('TkAgg')
 import numpy as np
 import matplotlib.pyplot as plt
+import scipy.signal as scipy
 
 def load_signal(data: np.ndarray, lead_index: int, use_time_column=False) -> (ndarray, ndarray):
     """
@@ -311,13 +312,57 @@ def cwiczenie3():
         plt.ylim(-1e-14, 1e-14)
         plt.show()
 
+def freq_filter(fs, cutoff, signal, type):
+    order = 4  # Order of the filter
+
+    # Normalize the cutoff frequency
+    nyquist = 0.5 * fs
+    normal_cutoff = cutoff / nyquist
+
+    # Design Butterworth low-pass filter
+    b, a = scipy.butter(order, normal_cutoff, btype=type, analog=False)
+    return scipy.filtfilt(b, a, signal)
+
+
 def cwiczenie4():
     data = np.loadtxt("ekg_noise.txt")
     time, signal = load_signal(data,1 )
     show_figure(time,[signal])
+    fs = 360
 
+    freq, values = get_signal_spectrum_fft(signal, fs, len(data))
+    show_figure(freq, [values], "Częstotliwość [Hz]")
+
+    filtered_signal = freq_filter(fs, 60, signal, 'low')
+
+    show_figure(time, [filtered_signal])
+
+    freq, values = get_signal_spectrum_fft(filtered_signal, fs, len(data))
+    show_figure(freq, [values], "Częstotliwość [Hz]")
+
+    diff_signal = signal - filtered_signal
+    show_figure(time, [diff_signal])
+
+    freq, values = get_signal_spectrum_fft(diff_signal, fs, len(data))
+    show_figure(freq, [values], "Częstotliwość [Hz]")
+
+    filtered_signal2 = freq_filter(fs, 5, filtered_signal, 'high')
+    show_figure(time, [filtered_signal2])
+
+    freq, values = get_signal_spectrum_fft(filtered_signal2, fs, len(data))
+    show_figure(freq, [values], "Częstotliwość [Hz]")
+
+    diff_signal2 = filtered_signal - filtered_signal2
+    show_figure(time, [diff_signal2])
+
+    freq, values = get_signal_spectrum_fft(diff_signal2, fs, len(data))
+    show_figure(freq, [values], "Częstotliwość [Hz]")
+
+
+
+# TODO: wykres tlumienia od czestotliwosci, charakterystyka filtra
 # TODO: Kontynuować zadania (cwiczenie 4)
-#cwiczenie1()
+cwiczenie1()
 cwiczenie2()
 cwiczenie3()
-#cwiczenie4()
+cwiczenie4()
