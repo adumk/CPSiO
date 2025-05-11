@@ -314,8 +314,13 @@ def filtr_sobel(obraz):
 
     # Łączenie wyników, aby uzyskać krawędzie ukośne
     krawedzie_ukosne = np.sqrt(krawedzie_poziome ** 2 + krawedzie_pionowe ** 2)
+    krawedzie_ukosne = np.round(krawedzie_ukosne).astype(np.uint8)
 
-    return Image.fromarray(krawedzie_poziome), Image.fromarray(krawedzie_pionowe), Image.fromarray(krawedzie_ukosne)
+    poz = Image.fromarray(krawedzie_poziome)
+    pio = Image.fromarray(krawedzie_pionowe)
+    uks = Image.fromarray(krawedzie_ukosne)
+
+    return poz, pio, uks
 
 
 def filtr_laplasjan(obraz):
@@ -328,7 +333,12 @@ def filtr_laplasjan(obraz):
 
     # Wyostrzanie obrazu: oryginalny obraz + wyostrzona wersja (Laplasjan)
     wyostrzony_obraz = obraz_array + laplasjan_obraz
-    return wyostrzony_obraz
+
+    # Konwersja: przycięcie wartości i zmiana typu danych
+    wyostrzony_obraz = np.clip(wyostrzony_obraz, 0, 255).astype(np.uint8)
+
+    # Konwersja z tablicy NumPy do obrazu PIL
+    return Image.fromarray(wyostrzony_obraz)
 
 
 def unsharp_masking(obraz, sigma=1.0, amount=1.5):
@@ -340,7 +350,12 @@ def unsharp_masking(obraz, sigma=1.0, amount=1.5):
 
     # Subtrakcja rozmytego obrazu od oryginalnego (wyostrzanie)
     sharp_image = obraz_array + amount * (obraz_array - rozmyty_obraz)
-    return np.clip(sharp_image, 0, 255)
+
+    # Konwersja: przycięcie wartości i zmiana typu danych
+    sharp_image = np.clip(sharp_image, 0, 255).astype(np.uint8)
+
+    # Konwersja z tablicy NumPy do obrazu PIL
+    return Image.fromarray(sharp_image)
 
 
 def high_boost_filtering(obraz, sigma=1.0, gain=1.5):
@@ -352,7 +367,12 @@ def high_boost_filtering(obraz, sigma=1.0, gain=1.5):
 
     # High boost filtering (zwiększanie szczegółów)
     high_boost_image = obraz_array + gain * (obraz_array - rozmyty_obraz)
-    return np.clip(high_boost_image, 0, 255)
+
+    # Konwersja: przycięcie wartości i zmiana typu danych
+    high_boost_image = np.clip(high_boost_image, 0, 255).astype(np.uint8)
+
+    # Konwersja z tablicy NumPy do obrazu PIL
+    return Image.fromarray(high_boost_image)
 
 
 def cwiczenie5():
@@ -501,7 +521,7 @@ def cwiczenie8():
     plt.figure(figsize=(12, 6))
     plt.subplot(1, 2, 1)
     plt.imshow(obraz_wyrownany, cmap='gray')
-    plt.title('Obraz po lokalnym wyrównaniu histogramu')
+    plt.title(f'Obraz po lokalnym wyrównaniu histogramu z maską rozmiaru {rozmiar_okna_wyrownania}')
     plt.axis('off')
 
     # Rysowanie histogramu po wyrównaniu
@@ -509,6 +529,7 @@ def cwiczenie8():
     rysuj_histogram(obraz_wyrownany, 'Histogram po wyrównaniu')
 
     # Wykonanie poprawy jakości na podstawie lokalnych statystyk
+    obraz = wczytaj_obraz(nazwa_pliku)
     obraz_poprawiony = lokalne_poprawa_jakosci(obraz, int(rozmiar_okna_poprawy))
 
     # Wyświetlanie obrazu po poprawie jakości
@@ -525,9 +546,9 @@ def cwiczenie8():
     # Wyświetlanie wyników
     plt.show()
 
-def cwiczenie9():
+def cwiczenie9(nazwa_pliku):
     # Wczytanie obrazu (np. zdjęcie w skali szarości)
-    nazwa_pliku = input("Podaj nazwę pliku obrazu (np. obraz.jpg): ")
+    #nazwa_pliku = input("Podaj nazwę pliku obrazu (np. obraz.jpg): ")
     obraz = Image.open(nazwa_pliku).convert('L')  # Wczytywanie w skali szarości
 
     # Dodanie szumu "sól i pieprz"
@@ -538,28 +559,31 @@ def cwiczenie9():
     pokaz_obraz_i_histogram(obraz_szum, "Obraz z szumem 'sól i pieprz'")
 
     # Zastosowanie filtrów
-    maska_rozmiar = 3
+    rozmiary = [3,5,7]
 
-    # Filtr uśredniający
-    obraz_umediany = filtr_usredniajacy(obraz_szum, maska_rozmiar)
-    pokaz_obraz_i_histogram( obraz_umediany, "Filtr uśredniający")
 
-    # Filtr medianowy
-    obraz_medianowy = filtr_medianowy(obraz_szum, maska_rozmiar)
-    pokaz_obraz_i_histogram( obraz_medianowy, "Filtr medianowy")
+    for maska_rozmiar in rozmiary:
+        # Filtr uśredniający
+        obraz_umediany = filtr_usredniajacy(obraz_szum, maska_rozmiar)
+        pokaz_obraz_i_histogram( obraz_umediany, f"Liniowy filtr uśredniający maska - {maska_rozmiar}")
 
-    # Filtr minimum
-    obraz_min = filtr_minimum(obraz_szum, maska_rozmiar)
-    pokaz_obraz_i_histogram(obraz_min, "Filtr minimum")
+        # Filtr medianowy
+        obraz_medianowy = filtr_medianowy(obraz_szum, maska_rozmiar)
+        pokaz_obraz_i_histogram( obraz_medianowy, f"Filtr medianowy maska - {maska_rozmiar}")
 
-    # Filtr maksimum
-    obraz_max = filtr_maksimum(obraz_szum, maska_rozmiar)
-    pokaz_obraz_i_histogram( obraz_max, "Filtr maksimum")
+        # Filtr minimum
+        obraz_min = filtr_minimum(obraz_szum, maska_rozmiar)
+        pokaz_obraz_i_histogram(obraz_min, f"Filtr minimum maska - {maska_rozmiar}")
 
-def cwiczenie10():
+        # Filtr maksimum
+        obraz_max = filtr_maksimum(obraz_szum, maska_rozmiar)
+        pokaz_obraz_i_histogram( obraz_max, f"Filtr maksimum maska - {maska_rozmiar}")
+
+def cwiczenie10(name):
     ######
     # Wczytanie obrazu (np. zdjęcie w skali szarości)
-    nazwa_pliku = input("Podaj nazwę pliku obrazu (np. obraz.jpg): ")
+    #nazwa_pliku = input("Podaj nazwę pliku obrazu (np. obraz.jpg): ")
+    nazwa_pliku = name
     obraz = Image.open(nazwa_pliku).convert('L')  # Wczytywanie w skali szarości
 
     # Rozmiar maski (możesz eksperymentować z różnymi wartościami)
@@ -577,8 +601,7 @@ def cwiczenie10():
 def cwiczenie11():
     ######
     # Wczytanie obrazu (np. zdjęcie w skali szarości)
-    nazwa_pliku = input("Podaj nazwę pliku obrazu (np. obraz.jpg): ")
-    obraz = Image.open(nazwa_pliku) # Wczytanie obrazu w odcieniach szarości
+    obraz = Image.open('circuitmask.tif') # Wczytanie obrazu w odcieniach szarości
 
     # 1. Wykrywanie krawędzi - Sobel
     krawedzie_poziome, krawedzie_pionowe, krawedzie_ukosne = filtr_sobel(obraz)
@@ -586,13 +609,27 @@ def cwiczenie11():
     pokaz_obraz_i_histogram(krawedzie_pionowe, 'Krawędzie pionowe Sobel')
     pokaz_obraz_i_histogram(krawedzie_ukosne, 'Krawędzie ukośne Sobel')
 
+    obraz = Image.open('testpat1.png')  # Wczytanie obrazu w odcieniach szarości
+
+    # 1. Wykrywanie krawędzi - Sobel
+    krawedzie_poziome, krawedzie_pionowe, krawedzie_ukosne = filtr_sobel(obraz)
+    pokaz_obraz_i_histogram(krawedzie_poziome, 'Krawędzie poziome Sobel')
+    pokaz_obraz_i_histogram(krawedzie_pionowe, 'Krawędzie pionowe Sobel')
+    pokaz_obraz_i_histogram(krawedzie_ukosne, 'Krawędzie ukośne Sobel')
+
+    obraz = Image.open('blurry-moon.tif')  # Wczytanie obrazu w odcieniach szarości
+
     # 2. Wyostrzanie obrazu za pomocą Laplasjanu
     wyostrzony_obraz = filtr_laplasjan(obraz)
     pokaz_obraz_i_histogram(wyostrzony_obraz, 'Wyostrzony obraz - Laplasjan')
 
+    obraz = Image.open('text-dipxe-blurred.tif')  # Wczytanie obrazu w odcieniach szarości
+
     # 3. Unsharp Masking
     unsharp_obraz = unsharp_masking(obraz, sigma=1.0, amount=1.5)
     pokaz_obraz_i_histogram(unsharp_obraz, 'Wyostrzony obraz - Unsharp Masking')
+
+    obraz = Image.open('text-dipxe-blurred.tif')  # Wczytanie obrazu w odcieniach szarości
 
     # 4. High Boost Filtering
     high_boost_obraz = high_boost_filtering(obraz, sigma=1.0, gain=1.5)
@@ -606,12 +643,20 @@ def cwiczenie12():
 
 def main():
     #cwiczenie5()
-    # cwiczenie6()
-    # cwiczenie7()
-    # cwiczenie8()
-    # cwiczenie9()
-    # cwiczenie10()
-     cwiczenie11()
+    #cwiczenie6()
+    #cwiczenie7()
+    #TODO lokalna poprawa
+    #while True:
+    #    cwiczenie8()
+    # nazwy = ['cboard_pepper_only.tif', 'cboard_salt_only.tif', 'cboard_salt_pepper.tif']
+    # for name in nazwy:
+    #     cwiczenie9(name)
+
+    # nazwy = ['characters_test_pattern.tif', 'zoneplate.tif']
+    # for name in nazwy:
+    #     cwiczenie10(name)
+    #cwiczenie10()
+    cwiczenie11()
 
 if __name__ == "__main__":
     main()
