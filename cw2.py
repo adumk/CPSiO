@@ -135,25 +135,28 @@ def przeksztalcenie_gamma_function(r, c, gamma):
     """Pomocnicza funkcja do wykresu korekcji gamma."""
     return np.clip(c * (r / 255) ** gamma * 255, 0, 255)
 
-
 def wyrownaj_histogram(obraz):
-    """Wyrównywanie histogramu obrazu."""
-    obraz_gray = obraz.convert('L')  # Przekształcamy obraz do odcieni szarości
+    """Wyrównywanie histogramu obrazu w skali szarości."""
+    # Konwersja do skali szarości
+    obraz_gray = obraz.convert('L')
     obraz_array = np.array(obraz_gray)
 
-    # Obliczanie histogramu i skumulowanej funkcji rozkładu
+    # Histogram
     hist, bins = np.histogram(obraz_array.flatten(), bins=256, range=(0, 256))
 
-    cdf = hist.cumsum()  # CDF (Skumulowana funkcja rozkładu)
-    cdf_normalized = cdf * hist.max() / cdf.max()  # Normalizowanie CDF
+    # Skumulowana funkcja rozkładu (CDF)
+    cdf = hist.cumsum()
 
-    # Mapowanie wartości pikseli na nowy zakres
-    obraz_eq = np.interp(obraz_array.flatten(), bins[:-1], cdf_normalized)
+    # Normalizacja CDF do zakresu [0, 255]
+    cdf_m = np.ma.masked_equal(cdf, 0)  # Maskujemy zera
+    cdf_m = (cdf_m - cdf_m.min()) * 255 / (cdf_m.max() - cdf_m.min())  # Normalizacja
+    cdf = np.ma.filled(cdf_m, 0).astype('uint8')  # Zastępujemy maskę zerami
+
+    # Mapowanie oryginalnych pikseli przez wyrównany CDF
+    obraz_eq = cdf[obraz_array]
 
     # Przekształcenie z powrotem do obrazu
-    obraz_eq = obraz_eq.reshape(obraz_array.shape)
-
-    return Image.fromarray(np.uint8(obraz_eq))
+    return Image.fromarray(obraz_eq)
 
 
 def rysuj_histogram(obraz, tytul):
@@ -194,20 +197,37 @@ def lokalne_poprawa_jakosci(obraz, rozmiar_okna=10):
     obraz_gray = obraz.convert('L')  # Przekształcamy obraz do odcieni szarości
     obraz_array = np.array(obraz_gray)
 
+    # Parametry progowe
+    C = 22.8
+    k0 = k2 = 0
+    k1 = k3 = 0.1
+
+    # Globalne statystyki
+    mG = np.mean(obraz_array)
+    sigmaG = np.std(obraz_array)
+
     k, l = rozmiar_okna, rozmiar_okna
     wyniki = np.zeros_like(obraz_array)
-
-    #TODO: zaimplementowac funkcje progowa - wyklad 3 slajd 120
 
     # Przechodzimy po obrazie w oknach
     for i in range(rozmiar_okna // 2, obraz_array.shape[0] - rozmiar_okna // 2):
         for j in range(rozmiar_okna // 2, obraz_array.shape[1] - rozmiar_okna // 2):
             okno = obraz_array[i - k // 2:i + k // 2 + 1, j - l // 2:j + l // 2 + 1]
+
             # Obliczanie lokalnych statystyk: średnia i odchylenie standardowe
-            lokalna_srednia = np.mean(okno)
-            lokalne_odchylenie = np.std(okno)
-            # Normalizacja: ustawienie piksela w nowym obrazie na podstawie lokalnej średniej
-            wyniki[i, j] = np.clip(obraz_array[i, j] - lokalna_srednia + 128, 0, 255)
+            mSxy = np.mean(okno)
+            sigmaSxy = np.std(okno)
+
+            fxy = obraz_array[i, j]
+
+            # Zastosowanie funkcji progowej
+            if (k0 * mG <= mSxy <= k1 * mG) and (k2 * sigmaG <= sigmaSxy <= k3 * sigmaG):
+                wartosc = C * fxy
+            else:
+                wartosc = fxy
+
+            # Zapisujemy przeskalowaną wartość z ograniczeniem do zakresu [0, 255]
+            wyniki[i, j] = np.clip(wartosc, 0, 255)
 
     return Image.fromarray(np.uint8(wyniki))
 
@@ -298,30 +318,35 @@ def zastosuj_filtr_gaussowski(obraz, rozmiar_maski):
     return obraz.filter(ImageFilter.GaussianBlur(rozmiar_maski))
 
 
-######
-#TODO: naprawic zwracany typ - np stworzyc osobna funkcje
 def filtr_sobel(obraz):
     """Wykrywanie krawędzi z użyciem filtra Sobela."""
-    # Sobel dla krawędzi poziomych (Gx) i pionowych (Gy)
-    obraz_array = np.array(obraz.convert('L'))  # Konwersja obrazu do odcieni szarości
+    # Konwersja do odcieni szarości
+    obraz_array = np.array(obraz.convert('L'))
 
-    Gx = np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]])  # Maska Sobela dla poziomych krawędzi
-    Gy = np.array([[-1, -2, -1], [0, 0, 0], [1, 2, 1]])  # Maska Sobela dla pionowych krawędzi
+    # Maski Sobela
+    Gx = np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]])
+    Gy = np.array([[-1, -2, -1], [0, 0, 0], [1, 2, 1]])
 
-    # Konwolucja obrazu z maskami
-    krawedzie_poziome = ndi.convolve(obraz_array, Gx)
-    krawedzie_pionowe = ndi.convolve(obraz_array, Gy)
+    # Konwolucja z maskami Sobela
+    sobel_x = ndi.convolve(obraz_array.astype(float), Gx)
+    sobel_y = ndi.convolve(obraz_array.astype(float), Gy)
 
-    # Łączenie wyników, aby uzyskać krawędzie ukośne
-    krawedzie_ukosne = np.sqrt(krawedzie_poziome ** 2 + krawedzie_pionowe ** 2)
-    krawedzie_ukosne = np.round(krawedzie_ukosne).astype(np.uint8)
+    # Magnituda gradientu
+    sobel_mag = np.hypot(sobel_x, sobel_y)
+    sobel_x = np.hypot(sobel_x, sobel_x)
+    sobel_y = np.hypot(sobel_y, sobel_y)
+    sobel_mag = np.clip(sobel_mag / sobel_mag.max() * 255, 0, 255).astype(np.uint8)
 
-    poz = Image.fromarray(krawedzie_poziome)
-    pio = Image.fromarray(krawedzie_pionowe)
-    uks = Image.fromarray(krawedzie_ukosne)
+    # Skalowanie wyników X i Y dla wizualizacji (z zachowaniem kontrastu)
+    sobel_x_norm = np.clip((sobel_x - sobel_x.min()) / (sobel_x.max() - sobel_x.min()) * 255, 0, 255).astype(np.uint8)
+    sobel_y_norm = np.clip((sobel_y - sobel_y.min()) / (sobel_y.max() - sobel_y.min()) * 255, 0, 255).astype(np.uint8)
 
-    return poz, pio, uks
+    # Tworzenie obrazów wynikowych
+    obraz_sobel_x = Image.fromarray(sobel_x_norm)
+    obraz_sobel_y = Image.fromarray(sobel_y_norm)
+    obraz_sobel_mag = Image.fromarray(sobel_mag)
 
+    return obraz_sobel_x, obraz_sobel_y, obraz_sobel_mag
 
 def filtr_laplasjan(obraz):
     """Zastosowanie filtra Laplasjanu do wyostrzania szczegółów."""
@@ -338,38 +363,40 @@ def filtr_laplasjan(obraz):
     wyostrzony_obraz = np.clip(wyostrzony_obraz, 0, 255).astype(np.uint8)
 
     # Konwersja z tablicy NumPy do obrazu PIL
-    return Image.fromarray(wyostrzony_obraz)
+    return Image.fromarray(wyostrzony_obraz), laplasjan_obraz
 
 
-def unsharp_masking(obraz, sigma=1.0, amount=1.5):
+def unsharp_masking(obraz, sigma=5.0, amount=1):
     """Zastosowanie unsharp masking do wyostrzania obrazu."""
     obraz_array = np.array(obraz.convert('L'))
 
     # Rozmywanie obrazu (sztuczne rozmycie)
     rozmyty_obraz = ndi.gaussian_filter(obraz_array, sigma)
 
+    rozmyty_obraz = np.array(rozmyty_obraz, dtype=np.float32) / 255.0
+    obraz_array = np.array(obraz_array, dtype=np.float32) / 255.0
+
     # Subtrakcja rozmytego obrazu od oryginalnego (wyostrzanie)
     sharp_image = obraz_array + amount * (obraz_array - rozmyty_obraz)
-
-    # Konwersja: przycięcie wartości i zmiana typu danych
-    sharp_image = np.clip(sharp_image, 0, 255).astype(np.uint8)
+    sharp_image = sharp_image * 255.0
 
     # Konwersja z tablicy NumPy do obrazu PIL
     return Image.fromarray(sharp_image)
 
 
-def high_boost_filtering(obraz, sigma=1.0, gain=1.5):
+def high_boost_filtering(obraz, sigma=5.0, gain=4.5):
     """Zastosowanie high boost filtering do wyostrzania obrazu."""
     obraz_array = np.array(obraz.convert('L'))
 
     # Rozmywanie obrazu (sztuczne rozmycie)
     rozmyty_obraz = ndi.gaussian_filter(obraz_array, sigma)
 
+    rozmyty_obraz = np.array(rozmyty_obraz, dtype=np.float32) / 255.0
+    obraz_array = np.array(obraz_array, dtype=np.float32) / 255.0
+
     # High boost filtering (zwiększanie szczegółów)
     high_boost_image = obraz_array + gain * (obraz_array - rozmyty_obraz)
-
-    # Konwersja: przycięcie wartości i zmiana typu danych
-    high_boost_image = np.clip(high_boost_image, 0, 255).astype(np.uint8)
+    high_boost_image = high_boost_image * 255.0
 
     # Konwersja z tablicy NumPy do obrazu PIL
     return Image.fromarray(high_boost_image)
@@ -462,37 +489,43 @@ def cwiczenie6():
     plt.show()
 
 def cwiczenie7():
-    # Wczytywanie obrazów (np. obrazy zbyt ciemne i zbyt jasne)
-    nazwa_pliku = input("Podaj nazwę pliku obrazu (ciemny lub jasny): ")
-    obraz = wczytaj_obraz(nazwa_pliku)
 
-    # Wyświetlanie obrazu przed wyrównaniem
-    plt.figure(figsize=(12, 6))
-    plt.subplot(1, 2, 1)
-    plt.imshow(obraz, cmap='gray')
-    plt.title('Obraz przed wyrównaniem')
-    plt.axis('off')
+    nazwy = [ 'chest-xray.tif', 'pollen-dark.tif', 'pollen-ligt.tif','pollen-lowcontrast.tif', 'pout.tif', 'spectrum.tif']
 
-    # Rysowanie histogramu przed wyrównaniem
-    plt.subplot(1, 2, 2)
-    rysuj_histogram(obraz, 'Histogram przed wyrównaniem')
 
-    # Wyrównywanie histogramu
-    obraz_wyr = wyrownaj_histogram(obraz)
+    for nazwa in nazwy:
+        # Wczytywanie obrazów (np. obrazy zbyt ciemne i zbyt jasne)
+        #nazwa_pliku = input("Podaj nazwę pliku obrazu (ciemny lub jasny): ")
+        nazwa_pliku = nazwa
+        obraz = wczytaj_obraz(nazwa_pliku)
 
-    # Wyświetlanie obrazu po wyrównaniu
-    plt.figure(figsize=(12, 6))
-    plt.subplot(1, 2, 1)
-    plt.imshow(obraz_wyr, cmap='gray')
-    plt.title('Obraz po wyrównaniu')
-    plt.axis('off')
+        # Wyświetlanie obrazu przed wyrównaniem
+        plt.figure(figsize=(12, 6))
+        plt.subplot(1, 2, 1)
+        plt.imshow(obraz, cmap='gray')
+        plt.title('Obraz przed wyrównaniem')
+        plt.axis('off')
 
-    # Rysowanie histogramu po wyrównaniu
-    plt.subplot(1, 2, 2)
-    rysuj_histogram(obraz_wyr, 'Histogram po wyrównaniu')
+        # Rysowanie histogramu przed wyrównaniem
+        plt.subplot(1, 2, 2)
+        rysuj_histogram(obraz, 'Histogram przed wyrównaniem')
 
-    # Wyświetlanie wyników
-    plt.show()
+        # Wyrównywanie histogramu
+        obraz_wyr = wyrownaj_histogram(obraz)
+
+        # Wyświetlanie obrazu po wyrównaniu
+        plt.figure(figsize=(12, 6))
+        plt.subplot(1, 2, 1)
+        plt.imshow(obraz_wyr, cmap='gray')
+        plt.title('Obraz po wyrównaniu')
+        plt.axis('off')
+
+        # Rysowanie histogramu po wyrównaniu
+        plt.subplot(1, 2, 2)
+        rysuj_histogram(obraz_wyr, 'Histogram po wyrównaniu')
+
+        # Wyświetlanie wyników
+        plt.show()
 
 def cwiczenie8():
     # Wczytywanie obrazu (np. obrazy zbyt ciemne i zbyt jasne)
@@ -599,6 +632,10 @@ def cwiczenie10(name):
         pokaz_obraz_i_histogram(obraz_gaussowski, f'Filtr gaussowski - {rozmiar_maski}x{rozmiar_maski}')
 
 def cwiczenie11():
+    cwiczenie11_1()
+    #cwiczenie11_2()
+
+def cwiczenie11_1():
     ######
     # Wczytanie obrazu (np. zdjęcie w skali szarości)
     obraz = Image.open('circuitmask.tif') # Wczytanie obrazu w odcieniach szarości
@@ -620,32 +657,67 @@ def cwiczenie11():
     obraz = Image.open('blurry-moon.tif')  # Wczytanie obrazu w odcieniach szarości
 
     # 2. Wyostrzanie obrazu za pomocą Laplasjanu
-    wyostrzony_obraz = filtr_laplasjan(obraz)
+    wyostrzony_obraz, elo = filtr_laplasjan(obraz)
     pokaz_obraz_i_histogram(wyostrzony_obraz, 'Wyostrzony obraz - Laplasjan')
 
+
+def cwiczenie11_2():
     obraz = Image.open('text-dipxe-blurred.tif')  # Wczytanie obrazu w odcieniach szarości
 
     # 3. Unsharp Masking
-    unsharp_obraz = unsharp_masking(obraz, sigma=1.0, amount=1.5)
+    unsharp_obraz = unsharp_masking(obraz, sigma=5.0, amount=1)
     pokaz_obraz_i_histogram(unsharp_obraz, 'Wyostrzony obraz - Unsharp Masking')
 
     obraz = Image.open('text-dipxe-blurred.tif')  # Wczytanie obrazu w odcieniach szarości
 
     # 4. High Boost Filtering
-    high_boost_obraz = high_boost_filtering(obraz, sigma=1.0, gain=1.5)
+    high_boost_obraz = high_boost_filtering(obraz, sigma=5.0, gain=4.5)
     pokaz_obraz_i_histogram(high_boost_obraz, 'Wyostrzony obraz - High Boost')
 
-def cwiczenie12():
-    nazwa_pliku = input("Podaj nazwę pliku obrazu (np. obraz.jpg): ")
-    obraz = Image.open(nazwa_pliku)
 
+def cwiczenie12():
+    #nazwa_pliku = input("Podaj nazwę pliku obrazu (np. obraz.jpg): ")
+    obraz = Image.open("bonescan.tif")
+    pokaz_obraz_i_histogram(obraz, 'Początkowy obraz')
+
+
+    obraz, obraz_laplasjan = filtr_laplasjan(obraz)
+    pokaz_obraz_i_histogram(obraz, 'Obraz + Laplasjan 3x3')
+
+    poz,pio,uks = filtr_sobel(obraz)
+
+    obraz = np.array(obraz.convert('L')) + np.array(uks.convert('L'))
+    obraz = Image.fromarray(obraz)
+
+    pokaz_obraz_i_histogram(obraz, 'Obraz po wykorzystaniu gradientu Sobela')
+
+    obraz = filtr_usredniajacy(obraz, 5)
+    pokaz_obraz_i_histogram(obraz, 'Obraz po filtracji uśredniającej z maską 5x5')
+
+
+
+    obraz = np.array(obraz.convert('L'), dtype=np.float32) / 255.0
+    obraz_laplasjan = np.array(obraz_laplasjan, dtype=np.float32) / 255.0
+    obraz = obraz * obraz_laplasjan
+    obraz = obraz * 255.0
+    obraz = Image.fromarray(obraz)
+    pokaz_obraz_i_histogram(obraz, 'Iloczyn obrazu i Laplasjanu')
+
+    obraz = np.array(obraz.convert('L'), dtype=np.float32) / 255.0
+    obraz_wstepny = np.array(Image.open("bonescan.tif").convert('L'), dtype=np.float32) / 255.0
+    obraz = obraz + obraz_wstepny
+    obraz = obraz * 255.0
+    obraz = Image.fromarray(obraz)
+    pokaz_obraz_i_histogram(obraz, 'Suma obraz wstepnego i aktualnego')
+
+    obraz = przeksztalcenie_gamma(obraz, 1, 0.5)
+    pokaz_obraz_i_histogram(obraz, 'Transformacja potegowa c=1 y=0.5')
 
 
 def main():
     #cwiczenie5()
     #cwiczenie6()
     #cwiczenie7()
-    #TODO lokalna poprawa
     #while True:
     #    cwiczenie8()
     # nazwy = ['cboard_pepper_only.tif', 'cboard_salt_only.tif', 'cboard_salt_pepper.tif']
@@ -656,7 +728,8 @@ def main():
     # for name in nazwy:
     #     cwiczenie10(name)
     #cwiczenie10()
-    cwiczenie11()
+    #cwiczenie11()
+    cwiczenie12()
 
 if __name__ == "__main__":
     main()
